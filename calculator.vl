@@ -1,0 +1,141 @@
+
+module Mu4x1(
+    output m,
+    input s0, input s1,
+    input i0,
+    input i1, input i2, input i3
+);
+    
+    wire [1:0] not_s;
+
+    not(not_s[0], s0);
+    not(not_s[1], s1);
+
+    wire [3:0] and_i;
+
+    and a1(and_i[0], not_s[0], not_s[1], i0);
+    and a2(and_i[1], s0, not_s[1], i1);
+    and a3(and_i[2], not_s[0], s1, i2);
+    and a4(and_i[3], s0, s1, i3);
+
+    or o1(m, and_i[0], and_i[1], and_i[2], and_i[3]);
+
+endmodule
+
+module Mu2x1(
+    output m,
+    input s,
+    input i0, input i1
+);
+
+    wire not_s;
+
+    not(not_s, s);
+
+    wire [1:0] and_i;
+
+    and a1(and_i[0], not_s, i0);
+    and a1(and_i[1], s, i1);
+
+    or o1(m, and_i[0], and_i[1]);
+
+endmodule
+
+module Half_Adder(
+    output sum,
+    output carry,
+    input a,
+    input b
+);
+
+    xor s1(sum, a, b);
+    and c0(carry, a, b);
+
+endmodule
+
+module Full_Adder(
+    output carry,
+    output sum,
+    input a,
+    input b,
+    input c
+);
+
+    wire s1, s2, c1, c2;
+
+    Half_Adder h1(s1, c1, a, b);
+    Half_Adder h2(sum, c2, s1, c);
+    or or1(carry, c1, c2);
+
+endmodule
+
+module Calculator (
+    output [2:0] G, 
+    output carry,
+    input s0, input s1,
+    input [2:0] A,
+    input [2:0] B
+);
+
+    wire ZERO, ONE;
+    buf (ZERO, 0);
+    buf (ONE, 1);
+
+    wire [2:0] AB_mux;
+
+    Mu2x1 m1(AB_mux[0], s0, A[0], B[0]);
+    Mu2x1 m2(AB_mux[1], s0, A[1], B[1]);
+    Mu2x1 m3(AB_mux[2], s0, A[2], B[2]);
+
+
+    wire [2:0] xors;
+
+    xor x1(xors[0], s1, AB_mux[0]);
+    xor x2(xors[1], s1, AB_mux[1]);
+    xor x3(xors[2], s1, AB_mux[2]);
+
+
+    wire [2:0] AB01_mux;
+
+    Mu4x1 m4(AB01_mux[0], s0, s1, ONE, A[0], B[0], ONE);
+    Mu4x1 m5(AB01_mux[1], s0, s1, ZERO, A[1], B[1], ZERO);
+    Mu4x1 m6(AB01_mux[2], s0, s1, ZERO, A[2], B[2], ZERO);
+
+
+    wire [1:0] carries;
+
+    Full_Adder f1(carries[0], G[0], xors[0], AB01_mux[0], s1);
+    Full_Adder f2(carries[1], G[1], xors[1], AB01_mux[1], carries[0]);
+    Full_Adder f3(carry, G[2], xors[2], AB01_mux[2], carries[1]);
+    
+endmodule
+
+
+module TB_Calculator;
+
+
+    // inputs
+    reg signed [2:0] A;
+    reg signed [2:0] B;
+    reg [1:0] S = 0;
+
+    // output
+    wire signed [2:0] G;
+    wire carry_out;
+
+    Calculator calc(G, carry_out, S[0], S[1], A, B);
+
+    initial 
+    begin
+        $monitor($time, "\tA=%b, B=%b, S=%b, G=%b :::: A=%d, B=%d, G=%d ", A, B, S, G, A, B, G);
+        
+        repeat(40)
+        begin
+            #10 A = $random; B = $random; S = $random;
+            $display("\t\t\t_______________________________________________");
+        end
+
+        $finish;
+    end
+
+endmodule
